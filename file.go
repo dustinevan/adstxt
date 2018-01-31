@@ -35,7 +35,7 @@ type File struct {
 	Variables []Variable `json:"variables,omitempty"`
 
 	//
-	ErrLines []string
+	ErrLines []ErrorLine
 
 	// SHA256 checksum of the bytes in the response body
 	CheckSum string `json:"checksum"`
@@ -44,35 +44,33 @@ type File struct {
 	LookupTime time.Time `json:"lookup_time"`
 }
 
-func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, unparsedlines []string, errs []error) {
-
-
+func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (*File, error) {
 	if len(b) == 0 {
-		return nil, nil, []error{fmt.Errorf("empty bytes passed")}
+		return nil, fmt.Errorf("empty bytes passed")
 	}
 	if t == chron.ZeroValue().AsTime() {
-		return nil, nil, []error{fmt.Errorf("invalid lookup time passed")}
+		return nil, fmt.Errorf("invalid lookup time passed")
 	}
 	if url == "" || root == "" || adstxtdom == "" {
-		return nil, nil, []error{fmt.Errorf("invalid urls passed, %s %s %s", url, root, adstxtdom)}
+		return nil, fmt.Errorf("invalid urls passed, %s %s %s", url, root, adstxtdom)
+	}
+	recs, lcs, vars, errlines, err := Parse(b)
+	if err != nil {
+		return nil, err
 	}
 
 	cs := sha256.Sum256(b)
 
-	file = &File{
+	return &File{
 		URL:          url,
 		RootDomain:   root,
 		AdstxtDomain: adstxtdom,
-		Records:      make([]Record, 0),
-		LineComments: make([]LineComment, 0),
-		Variables:    make([]Variable, 0),
+		Records:      recs,
+		LineComments: lcs,
+		Variables:    vars,
+		ErrLines:     errlines,
 		CheckSum:     string(cs[:]),
-
-	}
-
-	//unparsedlines, errs = file.parse(b)
-
-	return
+	}, nil
 }
 
 func Parse(b []byte) (rec []Record, lc []LineComment, va []Variable, el []ErrorLine, e error) {
@@ -108,6 +106,7 @@ func Parse(b []byte) (rec []Record, lc []LineComment, va []Variable, el []ErrorL
 			el = append(el, ErrorLine{Error: err, Line: line, LineNum: i})
 			continue
 		}
+		r.LineNum = i
 		rec = append(rec, *r)
 	}
 
@@ -157,7 +156,7 @@ func ParseRecord(line string) (*Record, error) {
 
 	at := GetAccountType(fields[2])
 	if at == INVALID_ACCOUNT_TYPE {
-		return nil, fmt.Errorf( "encountered invalid account type %s", fields[2])
+		return nil, fmt.Errorf("encountered invalid account type %s", fields[2])
 	}
 	r.AccountType = at
 
@@ -180,9 +179,8 @@ func ParseVariable(line string) (*Variable, error) {
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("no = found, this is not an adstxt variable")
 	}
-	return &Variable{ Key: parts[0], Value: parts[1] }, nil
+	return &Variable{Key: parts[0], Value: parts[1]}, nil
 }
-
 
 func removeEmptyLines(file string) (lines []string) {
 	all := strings.Split(file, "\n")
@@ -214,6 +212,11 @@ func (f *File) String() string {
 	}
 	return string(bytes)
 }
+
+func (f *File) IsValidSubDomain(sub string) bool {
+	for f.Variables
+}
+
 
 type Record struct {
 	// (Required) The canonical domain name of the SSP, Exchange, Header Wrapper, etc system that
