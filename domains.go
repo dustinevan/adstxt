@@ -1,19 +1,19 @@
 package adstxt
 
 import (
-	"net/url"
 	"fmt"
-	"golang.org/x/net/publicsuffix"
+	"net/url"
 	"strings"
-	"github.com/gin-gonic/gin/json"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 type Domain struct {
-	Host string // sub2.sub1.test.co.jp
-	Root string // test.co.jp
-	PublicSuffix string // co.jp
-	ICANN bool // see PublicSuffix comments
-	Subs []string // [ "sub2" "sub1" ] most specific first
+	Host         string   // sub2.sub1.test.co.jp
+	Root         string   // test.co.jp
+	PublicSuffix string   // co.jp
+	ICANN        bool     // see PublicSuffix comments
+	Subs         []string // [ "sub2" "sub1" ] most specific first
 }
 
 func DomainFromURL(u *url.URL) (*Domain, error) {
@@ -37,11 +37,11 @@ func DomainFromURL(u *url.URL) (*Domain, error) {
 	subs := strings.Split(s, ".")
 
 	return &Domain{
-		Host: host,
-		Root: root,
+		Host:         host,
+		Root:         root,
 		PublicSuffix: ps,
-		ICANN: icann,
-		Subs: subs,
+		ICANN:        icann,
+		Subs:         subs,
 	}, nil
 }
 
@@ -53,14 +53,14 @@ func DomainFromString(domain string) (*Domain, error) {
 	return DomainFromURL(u)
 }
 
-func (d *Domain) DomainList() []string {
+func (d *Domain) SubDomainList() []string {
 	l := make([]string, 0)
-
-	for i := 0; i < len(d.Subs); i++ {
-		t := strings.Join(d.Subs[i:], ".")
-		l = append(l, t + "." + d.Root)
-	}
 	l = append(l, d.Root)
+
+	for i := len(d.Subs)-1; i < 0; i-- {
+		t := strings.Join(d.Subs[i:], ".")
+		l = append(l, t+"."+d.Root)
+	}
 	return l
 }
 

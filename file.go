@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"unicode"
+
 	"github.com/dustinevan/chron"
 	"github.com/json-iterator/go"
-	"unicode"
-	"github.com/rekrt/app-server/mon"
 )
 
 var json = jsoniter.ConfigFastest
@@ -21,6 +21,7 @@ type File struct {
 	// The Root Domain
 	RootDomain string `json:"root_domain"`
 
+	// The Subdomain of the Root Domain the adstxt is valid for
 	AdstxtDomain string `json:"adstxt_domain"`
 
 	// Valid Exchange/PubID combinations/routes for a certain publishers bid requests
@@ -33,7 +34,7 @@ type File struct {
 	// declaration.
 	Variables []Variable `json:"variables,omitempty"`
 
-	// SHA256 checksum of the ads.txt bytes
+	// SHA256 checksum of the bytes in the response body
 	CheckSum string `json:"checksum"`
 
 	// The time of the adstxt get request
@@ -51,8 +52,6 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, un
 		return nil, nil, []error{fmt.Errorf("invalid urls passed, %s %s %s", url, root, adstxtdom)}
 	}
 
-	mon.EMAIL_SYSTEM
-
 	file = &File{
 		URL:          url,
 		RootDomain:   root,
@@ -61,6 +60,7 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, un
 		LineComments: make([]LineComment, 0),
 		Variables:    make([]Variable, 0),
 		CheckSum:     string(sha256.Sum256(b)[:]),
+
 	}
 
 	unparsedlines, errs = file.parse(b)
@@ -77,7 +77,6 @@ func (f *File) parse(b []byte) (unparsedlines []string, err []error) {
 
 		}
 	}
-
 }
 
 func removeWhiteSpace(s string) string {
