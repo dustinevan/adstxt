@@ -34,7 +34,10 @@ func DomainFromURL(u *url.URL) (*Domain, error) {
 
 	s := strings.Replace(host, root, "", 1)
 	s = strings.TrimRight(s, ".")
-	subs := strings.Split(s, ".")
+	subs := make([]string, 0)
+	if s != "" {
+		subs = strings.Split(s, ".")
+	}
 
 	return &Domain{
 		Host:         host,
@@ -45,19 +48,17 @@ func DomainFromURL(u *url.URL) (*Domain, error) {
 	}, nil
 }
 
+// This supports sub2.sub1.root.com format. Data not in this format should  in URL format should use
+// Should use url.Parse and then DomainFromURL
 func DomainFromString(domain string) (*Domain, error) {
-	u, err := url.Parse(domain)
-	if err != nil {
-		return nil, err
-	}
-	return DomainFromURL(u)
+	return DomainFromURL(&url.URL{Host:domain})
 }
 
-func (d *Domain) SubDomainList() []string {
+func (d *Domain) ListDomains() []string {
 	l := make([]string, 0)
 	l = append(l, d.Root)
 
-	for i := len(d.Subs)-1; i < 0; i-- {
+	for i := len(d.Subs)-1; i >= 0; i-- {
 		t := strings.Join(d.Subs[i:], ".")
 		l = append(l, t+"."+d.Root)
 	}

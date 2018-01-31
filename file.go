@@ -34,6 +34,9 @@ type File struct {
 	// declaration.
 	Variables []Variable `json:"variables,omitempty"`
 
+	//
+	ErrLines []string
+
 	// SHA256 checksum of the bytes in the response body
 	CheckSum string `json:"checksum"`
 
@@ -42,6 +45,8 @@ type File struct {
 }
 
 func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, unparsedlines []string, errs []error) {
+
+
 	if len(b) == 0 {
 		return nil, nil, []error{fmt.Errorf("empty bytes passed")}
 	}
@@ -52,6 +57,8 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, un
 		return nil, nil, []error{fmt.Errorf("invalid urls passed, %s %s %s", url, root, adstxtdom)}
 	}
 
+	cs := sha256.Sum256(b)
+
 	file = &File{
 		URL:          url,
 		RootDomain:   root,
@@ -59,24 +66,134 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (file *File, un
 		Records:      make([]Record, 0),
 		LineComments: make([]LineComment, 0),
 		Variables:    make([]Variable, 0),
-		CheckSum:     string(sha256.Sum256(b)[:]),
+		CheckSum:     string(cs[:]),
 
 	}
 
-	unparsedlines, errs = file.parse(b)
+	//unparsedlines, errs = file.parse(b)
 
 	return
 }
 
-func (f *File) parse(b []byte) (unparsedlines []string, err []error) {
-	lines := strings.Split(strings.Replace(string(b), "\n\n", "\n", -1), "\n")
+func Parse(b []byte) (rec []Record, lc []LineComment, va []Variable, el []ErrorLine, e error) {
+	if strings.Contains(string(b), "<html") {
+		return nil, nil, nil, nil, fmt.Errorf("parser encountered html")
+	}
+
+	lines := removeEmptyLines(string(b))
 
 	for i, line := range lines {
-		line = removeWhiteSpace(line)
-		if line[0] == '#' && len(line) > 0 {
-
+		if line == "" {
+			panic("empty line, this is a bug")
 		}
+
+		if line[0] == '#' {
+			lc = append(lc, LineComment{Text: line, LineNum: i})
+			continue
+		}
+
+		if strings.Contains(line, "=") {
+			v, err := ParseVariable(line)
+			if err != nil {
+				el = append(el, ErrorLine{Error: err, Line: line, LineNum: i})
+				continue
+			}
+			v.LineNum = i
+			va = append(va, *v)
+			continue
+		}
+
+		r, err := ParseRecord(line)
+		if err != nil {
+			el = append(el, ErrorLine{Error: err, Line: line, LineNum: i})
+			continue
+		}
+		rec = append(rec, *r)
 	}
+
+	if len(rec) == 0 {
+		return nil, nil, nil, nil, fmt.Errorf("parser found no valid adstxt records")
+	}
+
+	return
+}
+
+func ParseRecord(line string) (*Record, error) {
+	r := &Record{}
+
+	// get comments
+	i := strings.Index(line, "#")
+	if i > -1 {
+		if i == 0 {
+			return nil, fmt.Errorf("this is a line comment")
+		}
+		r.Comment = line[i:]
+		line = line[:i]
+	}
+
+	// get extensions
+	if strings.Contains(line, ";") {
+		s := strings.Split(line, ";")
+		line = s[0]
+		r.Ext = s[1:]
+	}
+
+	// split fields
+	line = strings.Trim(line, ",")
+	fields := strings.Split(line, ",")
+	if len(fields) < 3 {
+		return nil, fmt.Errorf("%s only has %v fields, at least 3 required", line, len(fields))
+	}
+
+	r.AdSystemDomain = fields[0]
+
+	// attempt to find a canonical ad system domain, do nothing if we can't find one
+	adsys, err := GetCanonicalAdSystemDomain(fields[0])
+	if err == nil {
+		r.CanonicalSystemDomain = strings.ToLower(adsys)
+	}
+
+	r.PublisherID = fields[1]
+
+	at := GetAccountType(fields[2])
+	if at == INVALID_ACCOUNT_TYPE {
+		return nil, fmt.Errorf( "encountered invalid account type %s", fields[2])
+	}
+	r.AccountType = at
+
+	if len(fields) == 4 {
+		r.CertAuthorityID = fields[3]
+	}
+
+	if len(fields) > 4 {
+		return nil, fmt.Errorf("too many fields. found %v, expected 3 or 4", len(fields))
+	}
+
+	return r, nil
+}
+
+func ParseVariable(line string) (*Variable, error) {
+	parts := strings.Split(line, "=")
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("found too many parts while parsing variable")
+	}
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("no = found, this is not an adstxt variable")
+	}
+	return &Variable{ Key: parts[0], Value: parts[1] }, nil
+}
+
+
+func removeEmptyLines(file string) (lines []string) {
+	all := strings.Split(file, "\n")
+	for _, l := range all {
+		line := removeWhiteSpace(l)
+		if len(line) == 0 {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 func removeWhiteSpace(s string) string {
@@ -147,7 +264,7 @@ type LineComment struct {
 	Text string `json:"text"`
 
 	// Line number the comment was found on after removing empty lines. This is useful for
-	// attaching line comment information to records
+	// attaching line comment information to records.
 	LineNum int `json:"line_num"`
 }
 
@@ -156,7 +273,18 @@ type Variable struct {
 	Value string `json:"value"`
 
 	// Line number the comment was found on after removing empty lines. This is useful for
-	// attaching line comment information to records
+	// attaching line comment information to records.
+	LineNum int `json:"line_num"`
+}
+
+type ErrorLine struct {
+	// Reason the parse failed
+	Error error `json:"error"`
+
+	// Original data
+	Line string `json:"line"`
+
+	// Line number of the parse failure
 	LineNum int `json:"line_num"`
 }
 
@@ -166,11 +294,12 @@ const (
 	NO_ACCOUNT_TYPE_SPECIFIED PublisherAccountType = iota
 	DIRECT
 	RESELLER
-	BOTH // optionally duplicate adsystem pubid combination with reseller and direct can be reduced to this
+	BOTH // some ads.txt file contain duplicate rows for the same pubid with reseller and direct types. these can be reduced by calling DedupOnAccountType()
 	INVALID_ACCOUNT_TYPE
 )
 
 func GetAccountType(s string) PublisherAccountType {
+	s = strings.ToUpper(s)
 	switch s {
 	case "":
 		return NO_ACCOUNT_TYPE_SPECIFIED

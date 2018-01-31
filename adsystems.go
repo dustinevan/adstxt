@@ -1,8 +1,23 @@
 package adstxt
 
+import "golang.org/x/net/publicsuffix"
 
+func GetCanonicalAdSystemDomain(e string) (string, error) {
+	name, ok := adsysdoms[e]
+	if ok {
+		canonical, ok := adsysnames_canonical[name]
+		if ok {
+			return canonical, nil
+		}
+	}
+	domain, err := publicsuffix.EffectiveTLDPlusOne(e)
+	if err != nil {
+		return "", err
+	}
+	return domain, nil
+}
 
-var exdoms = map[string]string{"rubicon.com": "Rubicon Project",
+var adsysdoms = map[string]string{"rubicon.com": "Rubicon Project",
 	"fastlane.rubiconproject.com":                   "Rubicon Project",
 	"ads.rubiconproject.com":                        "Rubicon Project",
 	"rubiconproject.com":                            "Rubicon Project",
@@ -346,7 +361,7 @@ var exdoms = map[string]string{"rubicon.com": "Rubicon Project",
 	"juicenectar.com":                               "Juice Nectar",
 }
 
-var exnames_canonical = map[string]string{
+var adsysnames_canonical = map[string]string{
 	"Addroplet.com ":                  "addroplet.com ",
 	"Google AdX":                      "google.com",
 	"Adform":                          "adform.net",

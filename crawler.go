@@ -6,13 +6,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unicode"
-
-	"github.com/mediaFORGE/supplyqc/adpath/infra/data/enum"
 )
 
 var Client = http.Client{
 
+	// TODO fix using base domain instead of host
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) > 1 {
 			hosts := make(map[string]struct{})
@@ -29,8 +27,6 @@ var Client = http.Client{
 	Timeout: time.Second * 10,
 }
 
-
-
 func Crawl(domain string) (file []byte, url string, err error) {
 	d, err := DomainFromString(domain)
 	if err != nil {
@@ -38,20 +34,24 @@ func Crawl(domain string) (file []byte, url string, err error) {
 	}
 
 	var errs error
-	l := d.DomainList()
+	l := d.ListDomains()
 
-	// choose the ads.txt with the most specific url as long as it is not also provided by a less specific url.
+	// start with the root domain, if that domain returns an adstxt the contains a subdomain variable that
+	// matches any of the listed domains, travel there recursively. Keep the last valid ads.txt. If ads.txt
+	// files match its an error, keep the last valid ads.txt found.
 
 	for _, d := range l {
-		url, data, err := Get(d)
+		host, data, err := Get(d)
 		if err != nil {
 			errs = fmt.Errorf("%s error encountered while getting %s, %s", errs, d, err)
+			continue
 		}
+		Parse
 	}
 
 }
 
-func Get(domain string) (url string, bytes []byte, err error) {
+func Get(domain string) (host string, bytes []byte, err error) {
 	resp, err := Request(domain)
 	if err != nil {
 		return "", nil, err
@@ -60,16 +60,16 @@ func Get(domain string) (url string, bytes []byte, err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return resp.Request.URL.String(), b, err
+	return resp.Request.URL.Host, b, err
 
 }
 
 func Request(domain string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", "http://" + domain + "/ads.txt", nil)
+	req, err := http.NewRequest("GET", "http://"+domain+"/ads.txt", nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept","text/plain" )
+	req.Header.Set("Accept", "text/plain")
 	return Client.Do(req)
 }
 
@@ -91,4 +91,3 @@ func Read(resp *http.Response) ([]byte, error) {
 
 	return body, nil
 }
-
