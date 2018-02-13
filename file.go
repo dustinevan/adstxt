@@ -10,6 +10,7 @@ import (
 
 	"github.com/dustinevan/chron"
 	"github.com/json-iterator/go"
+	"encoding/base64"
 )
 
 var json = jsoniter.ConfigFastest
@@ -59,7 +60,8 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (*File, error) 
 		return nil, err
 	}
 
-	cs := sha256.Sum256(b)
+	sh := sha256.Sum256(b)
+	cs := base64.StdEncoding.EncodeToString(sh[:])
 
 	return &File{
 		URL:          url,
@@ -69,7 +71,7 @@ func NewFile(b []byte, t time.Time, url, root, adstxtdom string) (*File, error) 
 		LineComments: lcs,
 		Variables:    vars,
 		ErrLines:     errlines,
-		CheckSum:     string(cs[:]),
+		CheckSum:     cs,
 	}, nil
 }
 
@@ -179,7 +181,7 @@ func ParseVariable(line string) (*Variable, error) {
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("no = found, this is not an adstxt variable")
 	}
-	return &Variable{Key: parts[0], Value: parts[1]}, nil
+	return &Variable{Key: strings.ToLower(parts[0]), Value: parts[1]}, nil
 }
 
 func removeEmptyLines(file string) (lines []string) {
@@ -214,9 +216,13 @@ func (f *File) String() string {
 }
 
 func (f *File) IsValidSubDomain(sub string) bool {
-	for f.Variables
+	for _, v := range f.Variables {
+		if v.Key == "subdomain" || v.Value == sub {
+			return true
+		}
+	}
+	return false
 }
-
 
 type Record struct {
 	// (Required) The canonical domain name of the SSP, Exchange, Header Wrapper, etc system that
@@ -301,6 +307,14 @@ const (
 	INVALID_ACCOUNT_TYPE
 )
 
+var pub_account_types = [...]string{
+	"No Account Type Specified",
+	"DIRECT",
+	"RESELLER",
+	"BOTH",
+	"Invalid Account Type",
+}
+
 func GetAccountType(s string) PublisherAccountType {
 	s = strings.ToUpper(s)
 	switch s {
@@ -313,4 +327,12 @@ func GetAccountType(s string) PublisherAccountType {
 	default:
 		return INVALID_ACCOUNT_TYPE
 	}
+}
+
+func (p PublisherAccountType) String() string {
+	return pub_account_types[int(p)]
+}
+
+func (p PublisherAccountType) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + p.String() + "\""), nil
 }

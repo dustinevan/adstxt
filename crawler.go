@@ -27,13 +27,13 @@ var Client = http.Client{
 	Timeout: time.Second * 10,
 }
 
-func Crawl(domain string) (file []byte, url string, err error) {
+func Crawl(domain string) (*File, error) {
 	d, err := DomainFromString(domain)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	var errs error
+	var errs []error
 	l := d.ListDomains()
 
 	// start with the root domain, if that domain returns an adstxt the contains a subdomain variable that
@@ -41,32 +41,36 @@ func Crawl(domain string) (file []byte, url string, err error) {
 	// files match its an error, keep the last valid ads.txt found.
 	var f *File
 	for _, dom := range l {
+		// only travel to subdomain if it's given as a var in the parent
+		if f != nil && !f.IsValidSubDomain(dom) {
+			continue
+		}
 		host, data, err := Get(dom)
 		if err != nil {
-			errs = fmt.Errorf("%s error encountered while getting %s, %s", errs, dom, err)
+			errs = append(errs, fmt.Errorf("error encountered while getting %s, %s", dom, err))
 			continue
 		}
 		newf, err := NewFile(data, time.Now(), dom, l[0], host)
 		if err != nil {
-			errs = fmt.Errorf( "%s error encountered while parsing adstxt from %s, %s", errs, dom, err)
+			errs = append(errs, fmt.Errorf( "error encountered while parsing adstxt from %s, %s", dom, err))
 			continue
 		}
-
 		// first adstxt found
 		if f == nil {
 			f = newf
 			continue
 		}
-
 		// the subdomain has the same adstxt
 		if f.CheckSum == newf.CheckSum {
 			continue
 		}
-
-
-
+		f = newf
 	}
 
+	if f == nil {
+		return nil, ErrJoin(errs, "|")
+	}
+	return f, nil
 }
 
 func Get(domain string) (host string, bytes []byte, err error) {
@@ -108,4 +112,12 @@ func Read(resp *http.Response) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func ErrJoin(errs []error, delim string) error {
+	s := make([]string, 0)
+	for _, e := range errs {
+		s = append(s, e.Error())
+	}
+	return fmt.Errorf("%s", strings.Join(s, delim))
 }
