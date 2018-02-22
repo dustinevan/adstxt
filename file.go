@@ -1,16 +1,16 @@
 package adstxt
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"strings"
 	"time"
-
 	"unicode"
+
+	"crypto/sha256"
+	"encoding/base64"
 
 	"github.com/dustinevan/chron"
 	"github.com/json-iterator/go"
-	"encoding/base64"
 )
 
 var json = jsoniter.ConfigFastest
@@ -128,7 +128,7 @@ func ParseRecord(line string) (*Record, error) {
 		if i == 0 {
 			return nil, fmt.Errorf("this is a line comment")
 		}
-		r.Comment = line[i:]
+		r.Comment = strings.Trim(line[i:], " #")
 		line = line[:i]
 	}
 
@@ -136,10 +136,13 @@ func ParseRecord(line string) (*Record, error) {
 	if strings.Contains(line, ";") {
 		s := strings.Split(line, ";")
 		line = s[0]
-		r.Ext = s[1:]
+		for _, e := range s[1:] {
+			r.Ext = append(r.Ext, strings.Trim(e, " "))
+		}
 	}
 
 	// split fields
+	line = removeWhiteSpace(line)
 	line = strings.Trim(line, ",")
 	fields := strings.Split(line, ",")
 	if len(fields) < 3 {
@@ -176,22 +179,26 @@ func ParseRecord(line string) (*Record, error) {
 func ParseVariable(line string) (*Variable, error) {
 	parts := strings.Split(line, "=")
 	if len(parts) > 2 {
-		return nil, fmt.Errorf("found too many parts while parsing variable")
+		return nil, fmt.Errorf("found too many parts while parsing variable %s", line)
 	}
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("no = found, this is not an adstxt variable")
+		return nil, fmt.Errorf("no '=' found, %s is not an adstxt variable", line)
 	}
-	return &Variable{Key: strings.ToLower(parts[0]), Value: parts[1]}, nil
+	k := strings.TrimSpace(parts[0])
+	v := strings.TrimSpace(parts[1])
+	if k == "" || v == "" {
+		return nil, fmt.Errorf("both key and value must exist. %s is not an adstxt variable", line)
+	}
+	return &Variable{Key: k, Value: v}, nil
 }
 
 func removeEmptyLines(file string) (lines []string) {
 	all := strings.Split(file, "\n")
 	for _, l := range all {
-		line := removeWhiteSpace(l)
-		if len(line) == 0 {
+		if len(l) == 0 {
 			continue
 		}
-		lines = append(lines, line)
+		lines = append(lines, l)
 	}
 	return lines
 }
