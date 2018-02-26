@@ -1,5 +1,6 @@
 # Crawler
-This ads.txt crawler, is written to the ads.txt specification found here https://iabtechlab.com/wp-content/uploads/2017/09/IABOpenRTB_Ads.txt_Public_Spec_V1-0-1.pdf. It handles redirects, correctly deals with subdomains, and handles common publisher implementation mistakes. The populated adstxt file object contains not only information about the ad paths, but also information about erroneous rows, inline comments, variables, etc. 
+This ads.txt crawler is written to the ads.txt specification found here https://iabtechlab.com/wp-content/uploads/2017/09/IABOpenRTB_Ads.txt_Public_Spec_V1-0-1.pdf. 
+It handles redirects, correctly deals with subdomains, and handles common publisher implementation mistakes. The populated adstxt file object contains not only information about the ad paths, but also information about erroneous rows, inline comments, variables, etc. 
 
 The file object also contains information about the crawl of the ads.txt, including the root domain, the domain for which the ads.txt is valid, the url of the ads.txt, The lookup time, and a file checksum. 
 
