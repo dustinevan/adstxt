@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/dustinevan/adstxt"
+	"github.com/dustinevan/go-utils/async"
+	"context"
 )
 
 var canonicalMapFile = flag.String("canonicalmap", "", "optional canonical-adsys.json to overwrite internal canonical maps")
@@ -33,12 +35,16 @@ func main() {
 	if len(domainargs) == 0 {
 		log.Fatal("not enough arguments", usage)
 	}
+
+	sem := async.NewSemaphore(100, context.Background())
 	var wg sync.WaitGroup
 	for _, url := range domainargs {
 		wg.Add(1)
 		go func(url string) {
-			log.Printf("crawling %s", url)
+			sem.Acquire()
+			defer sem.Release()
 			defer wg.Done()
+			log.Printf("crawling %s", url)
 			f, err := adstxt.Crawl(url)
 			if err != nil {
 				log.Println(err)
