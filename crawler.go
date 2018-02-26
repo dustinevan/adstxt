@@ -70,6 +70,7 @@ func Crawl(domain string) (*File, error) {
 	if f == nil {
 		return nil, ErrJoin(errs, "|")
 	}
+	f.LookupTime = time.Now()
 	return f, nil
 }
 

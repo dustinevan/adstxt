@@ -1,11 +1,16 @@
 package adstxt
 
-import "golang.org/x/net/publicsuffix"
+import (
+	"golang.org/x/net/publicsuffix"
+	"os"
+	"github.com/pkg/errors"
+	"io/ioutil"
+)
 
 func GetCanonicalAdSystemDomain(e string) (string, error) {
-	name, ok := adsysdoms[e]
+	name, ok := urlToCanonicalName[e]
 	if ok {
-		canonical, ok := adsysnames_canonical[name]
+		canonical, ok := canonicalNameToUrl[name]
 		if ok {
 			return canonical, nil
 		}
@@ -17,7 +22,31 @@ func GetCanonicalAdSystemDomain(e string) (string, error) {
 	return domain, nil
 }
 
-var adsysdoms = map[string]string{"rubicon.com": "Rubicon Project",
+func SetCanonicalMaps(filename string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return errors.Wrap(err,"failed to set canonical maps")
+	}
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set canonical maps, unable to read contents of %s", filename)
+	}
+	var m AdsystemMap
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set canonical maps, failed to unmarshal contents of %s into AdsystemMap obj", filename)
+	}
+	urlToCanonicalName = m.SysURLToCanonicalName
+	canonicalNameToUrl = m.CanonicalNameToUrl
+	return nil
+}
+
+type AdsystemMap struct {
+	SysURLToCanonicalName map[string]string `json:"sys_url_to_canonical_name"`
+	CanonicalNameToUrl    map[string]string `json:"canonical_name_to_url"`
+}
+
+var urlToCanonicalName = map[string]string{"rubicon.com": "Rubicon Project",
 	"fastlane.rubiconproject.com":                   "Rubicon Project",
 	"ads.rubiconproject.com":                        "Rubicon Project",
 	"rubiconproject.com":                            "Rubicon Project",
@@ -361,7 +390,7 @@ var adsysdoms = map[string]string{"rubicon.com": "Rubicon Project",
 	"juicenectar.com":                               "Juice Nectar",
 }
 
-var adsysnames_canonical = map[string]string{
+var canonicalNameToUrl = map[string]string{
 	"Addroplet.com ":                  "addroplet.com ",
 	"Google AdX":                      "google.com",
 	"Adform":                          "adform.net",
