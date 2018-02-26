@@ -7,11 +7,11 @@ The file object also contains information about the crawl of the ads.txt, includ
 There is some confusion about which paths to put in an ads.txt file and where that file should be located. For example many blogging domains serve the global ads.txt file on each blog subdomain. The crawler traverses the url subdomains to figure out which domain the ads.txt is valid for. Given ```myblog.blogdomain.com``` the crawler will ask for ```myblog.blogdomain.com/ads.txt```. If an ads.txt is found the crawler will then request ```blogdomain.com/ads.txt``` and compare checksums to see if the files are the same. This allows users of the crawler to avoid the possible n^2 duplication of ads.txt paths on blog domains.
 
 ## Example Usage:
-```git clone https://github.com/dustinevan/adstxt.git```
-```cd ./adstxt/app/atcrawl```
-```./atcrawl bloomberg.com/ads.txt```
-```./atcrawl batman.wikia.com/ads.txt```
-
+```bash
+git clone https://github.com/dustinevan/adstxt.git
+cd ./adstxt/app/atcrawl
+./atcrawl bloomberg.com/ads.txt
+./atcrawl batman.wikia.com/ads.txt
+```
 The example binary was built on masOS Sierra 10.12.6 with go1.9.2 darwin/amd64
-
 If you have implementation questions or are interested in how use this at scale, feel free to contact me at dustinevancurrie@gmail.com 
