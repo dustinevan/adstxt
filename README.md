@@ -15,4 +15,4 @@ cd ./adstxt/app/atcrawl
 ./atcrawl batman.wikia.com/ads.txt
 ```
 The example binary was built on masOS Sierra 10.12.6 with go1.9.2 darwin/amd64
-If you have implementation questions or are interested in how use this at scale, feel free to contact me at dustinevancurrie@gmail.com 
+If you have implementation questions or are interested in how use this at scale, feel free to contact me: dustinevancurrie@gmail.com 
